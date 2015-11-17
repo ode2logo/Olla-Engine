@@ -1,0 +1,557 @@
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1" />
+<link rel="shortcut icon" href=".ico">
+<link rel="icon" href=".ico">
+<title>AFIP</title>
+<script type="text/javascript" src="canvastext.js"></script>
+<script type="text/javascript" src="odeD.js"></script>
+<script type="text/javascript" src="mapsire.js"></script>
+<script type="text/javascript" src="manager.js"></script>
+<script>
+var connection;
+var divstatus=0;
+var status=0;
+var fps=0;
+var dps=0;
+var lps=0;
+var mapa="";
+var foga="";
+var fogb="";
+var ultevent=0;
+var camspeed=25;
+var camspeedrot=50;
+var canvasito;
+var panelX=130;
+var panelY=130;
+var isFullScreen=false;
+var seleccion=new Array();
+var seleccionstart=new Array();
+var playerDueno=1;
+/**inicons**/
+var caminando=0;
+var atacando=1;
+var casteando=2;
+var descansando=3;
+/**fincons**/
+var mundo=new odeD();
+	mundo.controlCamara=true; /*rotaciones, zoom*/
+	mundo.controlCamaraX=true;
+	mundo.controlCamaraY=true;
+var spritePk=new Array();
+	spritePk[0]=new Image(); spritePk[0].src='img/arbol.png';
+	spritePk[1]=new Image(); spritePk[1].src='img/bulba.png';
+	spritePk[2]=new Image(); spritePk[2].src='img/charmanderfull.png';
+	spritePk[3]=new Image(); spritePk[3].src='img/squirtlefull.png';
+	spritePk[5]=new Image(); spritePk[5].src='img/hero5.png';
+	spritePk[1001]=new Image(); spritePk[1001].src='img/trainer_rojo.png';
+	spritePk[1002]=new Image(); spritePk[1002].src='img/trainer_azul.png';
+	spritePk[2001]=new Image(); spritePk[2001].src='img/pokeball.png';
+var mapsire=new Mapsire();
+var manager=new Manager();
+
+function ini()
+{
+	canvasito=document.getElementById('canvasito');
+	document.onkeydown=pressTecla;
+	canvasito.onmousemove=mousm;
+	canvasito.onmouseup=mousu;
+	canvasito.onmousedown=mousd;
+	canvasito.oncontextmenu=function (ev) { ev.preventDefault(); ev.stopPropagation(); }
+	mundo.asociarCanvas(canvasito,postDibujo);
+	mundo.crearSprite(0,spritePk[0],1,1,32,48,1,2);
+	mundo.crearSprite(1,spritePk[1],4,2,32,32,1,1);
+	mundo.crearSprite(2,spritePk[2],8,8,24,24,1,1);
+	mundo.crearSprite(3,spritePk[3],8,8,24,24,1,1);
+	mundo.crearSprite(5,spritePk[5],8,8,24,24,1,1);
+	mundo.crearSprite(1001,spritePk[1001],4,1,32,64,1,2);
+	mundo.crearSprite(1002,spritePk[1002],4,1,32,64,1,2);
+	mundo.crearSprite(2001,spritePk[2001],1,1,32,32,0.5,0.5);
+	//manager;
+	manager.asociarMundo(mundo);
+	manager.asociarMapsire(mapsire);
+	manager.crearPisos();
+	//mundo.jumpCam([115,115,11]);
+	mundo.setDirCam(Math.PI*3/2);
+	mundo.jumpCam([64,64,10]);
+	setInterval("loop();",50);
+	setInterval("check();",1000);
+	/*n=mundo.crearObj2d(0,'Squirt',3,Math.PI*3/2,1,1,[64,64,0.1],0);
+	status=1;
+	camspeedrot=500;//*/
+}
+
+function maxWindow() {
+	var tofu=canvasito;//document.getElementById('toFullScreen');
+	if (tofu.webkitRequestFullScreen) tofu.webkitRequestFullScreen();
+	else tofu.mozRequestFullScreen();
+	
+	isFullScreen=true;
+	
+	document.getElementById('audio_m').play();
+}
+
+function loop()
+{
+	if ((status==2)&&(fps%5==1))
+		connection.send("posCam|"+mundo.camCord[0]+"|"+mundo.camCord[1]);
+	fps++;
+}
+
+function postDibujo()
+{
+	if (seleccionstart.length>2)
+	{
+		mundo.ctx.strokeStyle="rgb(255,255,255)";
+		mundo.ctx.strokeRect(seleccionstart[0],seleccionstart[1],seleccionstart[2]-seleccionstart[0],seleccionstart[3]-seleccionstart[1]);
+	}
+}
+
+function check()
+{
+	fps=0;
+	dps=0;
+	lps=0;
+	if (status==0)
+		newConn();
+}
+function newConn()
+{
+	/*status=1;
+	return;//*/
+	connection = new WebSocket("ws://localhost:8001");
+	connection.onopen = function () {
+		console.log("Connection opened");
+		connection.send("Login");
+		status=2;
+	}
+	connection.onclose = function () {
+		console.log("Connection closed");
+		status=0;
+	}
+	connection.onerror = function () {
+		console.error("Connection error");
+		status=0;
+	}
+	connection.onmessage = interpretarDatos;
+	status=1;
+}
+function interpretarDatos(e)
+{
+	dps+=e.data.length;
+	lps++;
+	var inn={};
+	eval("inn="+e.data);
+	if (inn.conid) conid=inn.conid;
+	//if (inn.foga) {foga=inn.foga;}
+	//if (inn.fogb) {fogb=inn.fogb;}
+	//if (inn.minimap) {mapa=inn.minimap;}
+	if (inn.ping) { var d=(new Date()).getTime()-parseInt(inn.ping); ping=(d+' ms'); }
+	if (inn.mp) { mapa=inn.mp; dibujarMinimapa(); }
+	if ((inn.ue)&&(inn.ue>ultevent)) {
+		//mapear();
+		ultevent=inn.ue;
+		manager.readUns(inn.un);
+		manager.readArs(inn.ar);
+		manager.readPys(inn.py);
+	}
+}
+function dibujarMinimapa()
+{
+	mundo.ctx.fillStyle="rgb(255,255,255)";
+	mundo.ctx.fillRect(0,0,130,130);
+	mundo.ctx.fillStyle="rgb(0,0,0)";
+	mundo.ctx.fillRect(1,1,128,128);
+	for(var i=0;i<mapa.length;i+=3) {
+		var w=mapa.charAt(i),
+			x=mapa.charCodeAt(i+1)-100,
+			y=mapa.charCodeAt(i+2)-100;
+		if (w=='C') {
+			mundo.ctx.fillStyle="rgb(255,0,0)";
+			mundo.ctx.fillRect(x,y,1,1);
+		} else if (w=='c') {
+			mundo.ctx.fillStyle="rgb(0,255,0)";
+			mundo.ctx.fillRect(x,y,1,1);
+		} else if (w=='B') {
+			mundo.ctx.fillStyle="rgb(180,0,0)";
+			mundo.ctx.fillRect(x-1,y-1,3,3);
+		} else if (w=='b') {
+			mundo.ctx.fillStyle="rgb(0,180,0)";
+			mundo.ctx.fillRect(x-1,y-1,3,3);
+		} else if (w=='T') {
+			mundo.ctx.fillStyle="rgb(255,0,0)";
+			mundo.ctx.fillRect(x-1,y-1,3,3);
+		} else if (w=='t') {
+			mundo.ctx.fillStyle="rgb(0,255,0)";
+			mundo.ctx.fillRect(x-1,y-1,3,3);
+		}
+	}
+	mundo.ctx.strokeStyle="rgb(255,255,255)";
+	mundo.ctx.strokeRect(mundo.camCord[0]-11,mundo.camCord[1]-11,21,21);
+	mundo.ctx.beginPath();
+	mundo.ctx.moveTo(mundo.camCord[0],mundo.camCord[1]);
+	mundo.ctx.lineTo(mundo.camCord[0]+14*Math.cos(mundo.oangle),mundo.camCord[1]+14*Math.sin(mundo.oangle));
+	mundo.ctx.stroke();
+	mundo.ctx.closePath();
+}
+function makeSeleccion(posi,inout) {
+	var afectar=new Array();
+	if ((posi.length<=2)||(Math.abs(posi[0]-posi[2])+Math.abs(posi[1]-posi[3])<10))
+	{
+		var dist=24,
+			cerc;
+		manager.odesUns.forEach(function (v) {
+			if (Math.abs(v.obj.lastDrawPos[0]-posi[0])+Math.abs(v.obj.lastDrawPos[1]-posi[1])<dist)
+			{
+				cerc=v;
+				dist=(Math.abs(v.obj.lastDrawPos[0]-posi[0])+Math.abs(v.obj.lastDrawPos[1]-posi[1]));
+			}
+		});
+		if (cerc) afectar.push(cerc);
+	}
+	else
+	{
+		if (posi[0]>posi[2]) { var tmp=posi[0]; posi[0]=posi[2]; posi[2]=tmp;}
+		if (posi[1]>posi[3]) { var tmp=posi[1]; posi[1]=posi[3]; posi[3]=tmp;}
+		manager.odesUns.forEach(function (v) {
+			if ((v.dueno==playerDueno)&&(posi[0]<v.obj.lastDrawPos[0])&&(posi[1]<v.obj.lastDrawPos[1])&&(posi[2]>v.obj.lastDrawPos[0])&&(posi[3]>v.obj.lastDrawPos[1]))
+			{
+				afectar.push(v);
+			}
+		});
+	}
+	//make
+	if (inout=='atk')
+	{
+		if (afectar.length>0) { afectar[0].obj.marcar=2; return afectar[0]; }
+		else return false;
+	}
+	else if (inout=='new')
+	{
+		seleccion.forEach(function (v) {
+			v.obj.marcar=0;
+		});
+		seleccion=afectar;
+		seleccion.forEach(function (v) {
+			v.obj.marcar=1;
+		});
+	}
+}
+function getPiso(posi) {
+	var dist=24,
+		cerc;
+	mundo.lastPolis.forEach(function (v) {
+		if (Math.abs(v.lastDrawPos[0]-posi[0])+Math.abs(v.lastDrawPos[1]-posi[1])<dist)
+		{
+			cerc=v;
+			dist=(Math.abs(v.lastDrawPos[0]-posi[0])+Math.abs(v.lastDrawPos[1]-posi[1]));
+		}
+	});
+	return cerc;
+}
+/*****************************************************************************/
+
+function pressTecla(o)
+{
+	k=o.keyCode;
+
+	if ((k==33)||(k==46)) //pgup or supr
+	{
+		if (mundo.controlCamara==true)
+		{
+			mundo.controlCamara=false;
+			for (i=1;i<=5;i++)
+			{
+				setTimeout((i==4?"mundo.controlCamara=true;":"")+"mundo.rotarCam(-"+(Math.PI/2/5)+");",i*camspeedrot);
+			}
+		}
+		o.preventDefault();
+	}
+	else if ((k==34)||(k==45)) //pgdown or insert
+	{
+		if (mundo.controlCamara==true)
+		{
+			mundo.controlCamara=false;
+			for (i=1;i<=5;i++)
+			{
+				setTimeout((i==4?"mundo.controlCamara=true;":"")+"mundo.rotarCam("+(Math.PI/2/5)+");",i*camspeedrot);
+			}
+		}
+		o.preventDefault();
+	}
+	else if (k==35) //end
+	{
+		if (mundo.controlCamara==true)
+		{
+			if ((mundo.camCord[2]-1>=3)&&(mundo.camCord[2]-1<=13))
+			{
+				mundo.controlCamara=false;
+				for (i=1;i<=5;i++)
+				{
+					setTimeout((i==4?"mundo.controlCamara=true;":"")+"mundo.moverCam([0,0,-0.2]);",i*camspeed);
+				}
+			}
+		}
+		o.preventDefault();
+	}
+	else if (k==36) //home
+	{
+		if (mundo.controlCamara==true)
+		{
+			if ((mundo.camCord[2]+1>=3)&&(mundo.camCord[2]+1<=13))
+			{
+				mundo.controlCamara=false;
+				for (i=1;i<=5;i++)
+				{
+					setTimeout((i==4?"mundo.controlCamara=true;":"")+"mundo.moverCam([0,0,0.2]);",i*camspeed);
+				}
+			}
+		}
+		o.preventDefault();
+	}
+	else if (k==37) //izq
+	{
+		if (mundo.controlCamaraX==true)
+		{
+			tox=Math.cos(mundo.oangle-Math.PI/2);
+			toy=Math.sin(mundo.oangle-Math.PI/2);
+			if ((mundo.camCord[0]+tox>=5)&&(mundo.camCord[0]+tox<=123)&&(mundo.camCord[1]+toy>=5)&&(mundo.camCord[1]+toy<=123))
+			{
+				mundo.controlCamaraX=false;
+				for (i=1;i<=5;i++)
+				{
+					setTimeout((i==4?"mundo.controlCamaraX=true;":"")+"mundo.moverCam(["+(tox/5)+","+(toy/5)+",0]);",i*camspeed);
+				}
+			}
+		}
+	}
+	else if (k==38) //arr
+	{
+		if (mundo.controlCamaraY==true)
+		{
+			tox=Math.cos(mundo.oangle+0);
+			toy=Math.sin(mundo.oangle+0);
+			if ((mundo.camCord[0]+tox>=5)&&(mundo.camCord[0]+tox<=123)&&(mundo.camCord[1]+toy>=5)&&(mundo.camCord[1]+toy<=123))
+			{
+				mundo.controlCamaraY=false;
+				for (i=1;i<=5;i++)
+				{
+					setTimeout((i==4?"mundo.controlCamaraY=true;":"")+"mundo.moverCam(["+(tox/5)+","+(toy/5)+",0]);",i*camspeed);
+				}
+			}
+		}
+		o.preventDefault();
+	}
+	else if (k==39) //der
+	{
+		if (mundo.controlCamaraX==true)
+		{
+			tox=Math.cos(mundo.oangle+Math.PI/2);
+			toy=Math.sin(mundo.oangle+Math.PI/2);
+			if ((mundo.camCord[0]+tox>=5)&&(mundo.camCord[0]+tox<=123)&&(mundo.camCord[1]+toy>=5)&&(mundo.camCord[1]+toy<=123))
+			{
+				mundo.controlCamaraX=false;
+				for (i=1;i<=5;i++)
+				{
+					setTimeout((i==4?"mundo.controlCamaraX=true;":"")+"mundo.moverCam(["+(tox/5)+","+(toy/5)+",0]);",i*camspeed);
+				}
+			}
+		}
+		o.preventDefault();
+	}
+	else if (k==40) //aba
+	{
+		if (mundo.controlCamaraY==true)
+		{
+			tox=Math.cos(mundo.oangle+Math.PI);
+			toy=Math.sin(mundo.oangle+Math.PI);
+			if ((mundo.camCord[0]+tox>=5)&&(mundo.camCord[0]+tox<=123)&&(mundo.camCord[1]+toy>=5)&&(mundo.camCord[1]+toy<=123))
+			{
+				mundo.controlCamaraY=false;
+				for (i=1;i<=5;i++)
+				{
+					setTimeout((i==4?"mundo.controlCamaraY=true;":"")+"mundo.moverCam(["+(tox/5)+","+(toy/5)+",0]);",i*camspeed);
+				}
+			}
+		}
+		o.preventDefault();
+	}
+	else if (k==13) //enter
+	{
+		//    document.getElementById('logs').focus();
+		o.preventDefault();
+	}
+	else
+	{
+		//alert(k);
+	}
+}
+
+function mousu(ev) {
+	var bt=ev.which;
+	var mx=ev.clientX-ev.target.offsetLeft;
+	var my=ev.clientY-ev.target.offsetTop;
+		mx=mx/canvasito.clientWidth*853;
+		my=my/canvasito.clientHeight*480;
+	/***/
+	if (mx<130&&my<130)
+	{
+		mx=Math.min(Math.max(mx,5),123);
+		my=Math.min(Math.max(my,5),123);
+		mundo.jumpCam([mx,my]);
+	}
+	else
+	{
+		if (bt==1)
+			makeSeleccion(seleccionstart,'new');
+		else if (bt==3)
+		{
+			var atk=makeSeleccion([mx,my],'atk');
+			if (atk)
+			{
+				connection.send("atk|"+atk.id);
+			}
+			else
+			{
+				var pis=getPiso([mx,my]);
+				if (pis)
+				{
+					connection.send("move|"+Math.floor(pis.pos[0]*100000/128)+"|"+Math.floor(pis.pos[1]*100000/128));
+				}
+			}
+		}
+	}
+	//erase sel
+	seleccionstart=new Array();
+	//if (bt==3) { ev.preventDefault(); ev.stopPropagation(); }
+}
+function mousm(ev) {
+	var mx=ev.clientX-ev.target.offsetLeft;
+	var my=ev.clientY-ev.target.offsetTop;
+		mx=mx/canvasito.clientWidth*853;
+		my=my/canvasito.clientHeight*480;
+	if ((mx<panelX)&&(my<panelY))
+	{
+		//mimimapa
+		//canvasito.style.cursor='pointer';
+	}
+		//canvasito.style.cursor='none';
+	if (mx<10)
+	{
+		if (mundo.controlCamaraX==true)
+		{
+			tox=Math.cos(mundo.oangle-Math.PI/2);
+			toy=Math.sin(mundo.oangle-Math.PI/2);
+			if ((mundo.camCord[0]+tox>=5)&&(mundo.camCord[0]+tox<=123)&&(mundo.camCord[1]+toy>=5)&&(mundo.camCord[1]+toy<=123))
+			{
+				mundo.controlCamaraX=false;
+				setTimeout("mundo.controlCamaraX=true;mundo.moverCam(["+(tox)+","+(toy)+",0]);",camspeed);
+			}
+		}
+	}
+	else if (mx>843)
+	{
+		if (mundo.controlCamaraX==true)
+		{
+			tox=Math.cos(mundo.oangle+Math.PI/2);
+			toy=Math.sin(mundo.oangle+Math.PI/2);
+			if ((mundo.camCord[0]+tox>=5)&&(mundo.camCord[0]+tox<=123)&&(mundo.camCord[1]+toy>=5)&&(mundo.camCord[1]+toy<=123))
+			{
+				mundo.controlCamaraX=false;
+				setTimeout("mundo.controlCamaraX=true;mundo.moverCam(["+(tox)+","+(toy)+",0]);",camspeed);
+			}
+		}
+	}
+	if (my<10)
+	{
+		if (mundo.controlCamaraY==true)
+		{
+			tox=Math.cos(mundo.oangle);
+			toy=Math.sin(mundo.oangle);
+			if ((mundo.camCord[0]+tox>=5)&&(mundo.camCord[0]+tox<=123)&&(mundo.camCord[1]+toy>=5)&&(mundo.camCord[1]+toy<=123))
+			{
+				mundo.controlCamaraY=false;
+				setTimeout("mundo.controlCamaraY=true;mundo.moverCam(["+(tox)+","+(toy)+",0]);",camspeed);
+			}
+		}
+	}
+	else if (my>470)
+	{
+		if (mundo.controlCamaraY==true)
+		{
+			tox=Math.cos(mundo.oangle+Math.PI);
+			toy=Math.sin(mundo.oangle+Math.PI);
+			if ((mundo.camCord[0]+tox>=5)&&(mundo.camCord[0]+tox<=123)&&(mundo.camCord[1]+toy>=5)&&(mundo.camCord[1]+toy<=123))
+			{
+				mundo.controlCamaraY=false;
+				setTimeout("mundo.controlCamaraY=true;mundo.moverCam(["+(tox)+","+(toy)+",0]);",camspeed);
+			}
+		}
+	}
+	
+	if (seleccionstart.length>0)
+	{
+		seleccionstart[2]=mx;
+		seleccionstart[3]=my;
+	}
+	
+	/*if (mundo.controlCamara)
+	{
+		var ce=mundo.calcCord([mundo.camCord[0],mundo.camCord[1],0]);
+		var mcx=((ce[0]-mx)/24);
+		var mcy=((ce[1]-my)/24);
+		
+		
+		var tx=mundo.camCord[0]+mcx*Math.sin(mundo.oangle)+mcy*Math.cos(mundo.oangle),
+			ty=mundo.camCord[1]-mcx*Math.cos(mundo.oangle)+mcy*Math.sin(mundo.oangle),
+			tz, tfx, tfy, dx, dy, ii;
+			tfx=Math.floor(tx);	tfy=Math.floor(ty);	ii=tfy*128+tfx;
+			dx=(tx-tfx)*(mapsire.terrlevel[ii+1]-mapsire.terrlevel[ii]);
+			dy=(ty-tfy)*(mapsire.terrlevel[ii+128]-mapsire.terrlevel[ii]);
+		tz=(dx+dy+mapsire.terrlevel[ii])/2; tx+=0.5;	ty+=0.5;
+		
+		mundo.mouseCord=[tx,ty,tz];
+		
+	}*/
+}
+function mousd(ev) {
+	var bt=ev.which;
+	var mx=ev.clientX-ev.target.offsetLeft;
+	var my=ev.clientY-ev.target.offsetTop;
+		mx=mx/canvasito.clientWidth*853;
+		my=my/canvasito.clientHeight*480;
+	/****/
+	if (mx<130&&my<130)
+	{
+		mx=Math.min(Math.max(mx,5),123);
+		my=Math.min(Math.max(my,5),123);
+		mundo.jumpCam([mx,my]);
+	}
+	else
+	{
+		if (bt==1)
+			seleccionstart=new Array(mx,my);
+	}
+	if (bt==3) { ev.preventDefault(); ev.stopPropagation(); }
+}
+</script>
+</head>
+<body style="margin:0px;background-color:#000;" onLoad="ini();">
+<center>
+	<canvas id='canvasito' width='853' height='480' style='border:none;background-color:#222;cursor:pointer;'>No te anda el canvas petón?</canvas>
+	<div style='display:inline-block;color:#fff;font-family:lucida console;' id='status'></div>
+	<audio id='audio_m' src='8bit_adventure.mp4' style='display none;'></audio>
+	<audio id='audio_fx0' src='' style='display none;'></audio>
+	<audio id='audio_fx1' src='' style='display none;'></audio>
+	<audio id='audio_fx2' src='' style='display none;'></audio>
+	<audio id='audio_fx3' src='' style='display none;'></audio>
+	<audio id='audio_fx4' src='' style='display none;'></audio>
+	<audio id='audio_fx5' src='' style='display none;'></audio>
+	<audio id='audio_fx6' src='' style='display none;'></audio>
+	<audio id='audio_fx7' src='' style='display none;'></audio>
+	<audio id='audio_fx8' src='' style='display none;'></audio>
+	<audio id='audio_fx9' src='' style='display none;'></audio>
+<br><button id='butti' onClick="maxWindow();">Entrar</button>
+</center>
+</body>
+</html>

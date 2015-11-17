@@ -1,0 +1,163 @@
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=ISO-8859-1" />
+<link rel="shortcut icon" href=".ico">
+<link rel="icon" href=".ico">
+<title>AFIP</title>
+<script type="text/javascript" src="canvastext.js"></script>
+<script type="text/javascript" src="odeD.js"></script>
+<script>
+var fps=0;
+var jonh;
+var mundo=new odeD();
+	mundo.controlCamara=true;
+var spritePk=new Array();
+	spritePk[0]=new Image(); spritePk[0].src='img/arbol.png';
+	spritePk[1]=new Image(); spritePk[1].src='img/bulba.png';
+	spritePk[2]=new Image(); spritePk[2].src='img/charm.png';
+	spritePk[3]=new Image(); spritePk[3].src='img/squir.png';
+	spritePk[1001]=new Image(); spritePk[1001].src='img/gorra.png';
+	spritePk[1002]=new Image(); spritePk[1002].src='img/sinhead.png';
+
+function ini()
+{
+  document.onkeydown=pressTecla;
+  mundo.asociarCanvas(document.getElementById('canvasito'));
+  mundo.crearSprite(0,spritePk[0],1,1,32,48);
+  mundo.crearSprite(1,spritePk[1],4,2,32,32);
+  mundo.crearSprite(2,spritePk[2],4,2,32,32);
+  mundo.crearSprite(3,spritePk[3],4,2,32,32);
+  mundo.crearSprite(1001,spritePk[1001],4,1,32,64);
+  mundo.crearSprite(1002,spritePk[1002],4,1,32,64);
+  crearBosque();
+  crearPisos();
+  jonh=mundo.crearObj2d(0,'Jonh',2,0,2,2,[2.5,2.5,0.1],0);
+  setInterval("loop();",50);
+}
+
+function loop()
+{
+	if (fps>=400) fps=0;
+		if (fps>=300) { jonh.pos[0]-=0.2; jonh.dir=270; }
+	else if (fps>=200) { jonh.pos[1]-=0.2; jonh.dir=180; }
+	else if (fps>=100) { jonh.pos[0]+=0.2; jonh.dir=90; }
+	else if (fps>=0) { jonh.pos[1]+=0.2; jonh.dir=0; }
+	jonh.accion=Math.floor(fps/2)%2;
+	fps++;
+}
+
+function crearBosque()
+{
+  for (i=10;i<20;i++)
+  {
+    mundo.crearObj2d(0,'Arbol',0,0,1,2,[i+0.5,5.5,0.1],0);
+    mundo.crearObj2d(0,'Arbol',0,0,1,2,[i+0.5,4.5,0.1],0);
+  }
+  //mundo.dibujarTodo();
+}
+
+function crearPisos()
+{
+  for (i=0;i<127;i++)
+  {
+    for (j=0;j<127;j++)
+    {
+      mundo.crearPoli(0,'',[[i,j,0],[i+1,j,0],[i+1,j+1,0],[i,j+1,0]],'rgba(0,0,0,1)','rgba(0,255,128,1)');
+    }
+  }
+  //mundo.dibujarTodo();
+}
+
+function pressTecla(o)
+{
+  k=o.keyCode;
+  if (k==37) //izq
+  {
+	if (mundo.controlCamara==true)
+	{
+		mundo.controlCamara=false;
+		for (i=1;i<=9;i++)
+		{
+			setTimeout((i==8?"mundo.controlCamara=true;":"")+"mundo.rotarCam(-10);/*mundo.dibujarTodo();*/",i*50);
+		}
+	}
+	o.preventDefault();
+  }
+  else if (k==38) //arr
+  {
+    if (mundo.controlCamara==true)
+    {
+		mundo.controlCamara=false;
+		for (i=1;i<=5;i++)
+		{
+			tox=Math.round(Math.cos(mundo.oangle/180*Math.PI))/5;
+			toy=Math.round(Math.sin(mundo.oangle/180*Math.PI))/5;
+			setTimeout((i==4?"mundo.controlCamara=true;":"")+"mundo.moverCam(["+tox+","+toy+",0]);/*mundo.dibujarTodo();*/",i*50);
+		}
+    }
+	o.preventDefault();
+  }
+  else if (k==39) //der
+  {
+    if (mundo.controlCamara==true)
+    {
+		mundo.controlCamara=false;
+		for (i=1;i<=9;i++)
+		{
+			setTimeout((i==8?"mundo.controlCamara=true;":"")+"mundo.rotarCam(+10);/*mundo.dibujarTodo();*/",i*50);
+		}
+    }
+	o.preventDefault();
+  }
+  else if (k==40) //aba
+  {
+    if (mundo.controlCamara==true)
+    {
+		mundo.controlCamara=false;
+		for (i=1;i<=5;i++)
+		{
+			tox=-Math.round(Math.cos(mundo.oangle/180*Math.PI))/5;
+			toy=-Math.round(Math.sin(mundo.oangle/180*Math.PI))/5;
+			setTimeout((i==4?"mundo.controlCamara=true;":"")+"mundo.moverCam(["+tox+","+toy+",0]);",i*50);
+		}
+    }
+	o.preventDefault();
+  }
+  else if (k==13) //enter
+  {
+    document.getElementById('logs').focus();
+	o.preventDefault();
+  }
+  else
+  {
+    //alert(k);
+  }
+}
+</script>
+</head>
+<body style="margin:0px;background-color:#000;" onLoad="ini();">
+<center>
+<canvas id='canvasito' width='640' height='480' style='border:none;background-color:#222;'>No te anda el canvas petón?</canvas>
+<!--<button onClick="mundo.dibujarTodo();">Yeiii</button>
+<button onClick="mundo.crearPoli(0,'',[[0,0,0],[1,0,0],[1,1,0],[0,1,0]],'rgba(0,0,0,1)','rgba(0,255,0,1)');/*mundo.dibujarTodo();*/">Crear Piso</button>
+<button onClick="mundo.crearPoli(0,'',[[0,0,0],[1,0,0],[1,0,1],[0,0,1]],'rgba(0,0,0,1)','rgba(0,255,0,1)');/*mundo.dibujarTodo();*/">Crear 1</button>
+<button onClick="mundo.crearPoli(0,'',[[0,0,0],[0,1,0],[0,1,1],[0,0,1]],'rgba(0,0,0,1)','rgba(0,255,0,1)');/*mundo.dibujarTodo();*/">Crear 2</button>
+<button onClick="mundo.crearPoli(0,'',[[0,1,0],[1,1,0],[1,1,1],[0,1,1]],'rgba(0,0,0,1)','rgba(0,255,0,1)');/*mundo.dibujarTodo();*/">Crear 3</button>
+<button onClick="mundo.crearPoli(0,'',[[1,0,0],[1,1,0],[1,1,1],[1,0,1]],'rgba(0,0,0,1)','rgba(0,255,0,1)');/*mundo.dibujarTodo();*/">Crear 4</button>
+<button onClick="mundo.crearPoli(0,'',[[0,0,1],[1,0,1],[1,1,1],[0,1,1]],'rgba(0,0,0,1)','rgba(0,255,0,1)');/*mundo.dibujarTodo();*/">Crear Techo</button>
+<button onClick="crearPisos();">Crear Pisos</button><br>
+<button onClick="mundo.crearPoli(0,'',[[0,0,0],[1,0,0],[1,-1,0],[0,-1,0]],'rgba(0,0,0,1)','rgba(0,0,255,1)');mundo.crearPoli(0,'',[[0,0,0],[-1,0,0],[-1,1,0],[0,1,0]],'rgba(0,0,0,1)','rgba(0,0,255,1)');mundo.crearPoli(0,'',[[0,1,0],[1,1,0],[1,2,0],[0,2,0]],'rgba(0,0,0,1)','rgba(0,0,255,1)');mundo.crearPoli(0,'',[[1,0,0],[2,0,0],[2,1,0],[1,1,0]],'rgba(0,0,0,1)','rgba(0,0,255,1)');/*mundo.dibujarTodo();*/">Crear Halls</button>
+<button onClick="mundo.crearObj2d(0,'Bulba',1,0,1,1,[0.5,-0.5,0],0);/*mundo.dibujarTodo();*/">Crear Bulba</button>
+<button onClick="mundo.crearObj2d(0,'Charm',2,270,1,1,[1.5,0.5,0],0);/*mundo.dibujarTodo();*/">Crear Charm</button>
+<button onClick="mundo.crearObj2d(0,'Squir',3,180,1,1,[0.5,1.5,0],0);/*mundo.dibujarTodo();*/">Crear Squir</button>
+<button onClick="mundo.crearObj2d(0,'TraG',1001,180,0.7,1.4,[-0.5,0.5,0],0);mundo.crearObj2d(0,'TraH',1002,180,0.7,1.4,[-0.5,0.5,0],0);/*mundo.dibujarTodo();*/">Crear Trainer</button>
+<button onClick="crearBosque();">Crear Bosque</button><br>
+<button onClick="mundo.moverCam([0,0,-1]);mundo.dibujarTodo();">Bajar</button>
+<button onClick="mundo.moverCam([0,0,+1]);mundo.dibujarTodo();">Subir</button>
+<button onClick="mundo.rotarCam(+15);mundo.dibujarTodo();">Rotar <</button>
+<button onClick="mundo.rotarCam(-15);mundo.dibujarTodo();">> Rotar</button>
+<br><textarea id='logs' cols='100' rows='2' onKeyUp="mundo.texto=this.value;mundo.dibujarTodo();" style="opacity:0;">
+</textarea>-->
+</center>
+</body>
+</html>

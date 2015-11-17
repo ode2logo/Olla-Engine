@@ -1,0 +1,184 @@
+<!DOCTYPE HTML>
+<html>
+<head>
+<style>
+	div.cuadrado {
+		background-color:#f00;
+		position:absolute;
+		width:32px;
+		height:32px;
+	}
+	div.status {
+		background-color:#000;
+		color:#fff;
+		text-align:right;
+	}
+	canvas {
+		background-color:#000;
+	}
+</style>
+<meta charset="utf-8">
+<title>Creep Map</title>
+<script>
+var connection;
+var ctx;
+var fps=0;
+var dps=0;
+var lps=0;
+var status=0;
+var conid=-1;
+var ping="---";
+var mapa="";
+var foga="";
+var fogb="";
+var ultevent=0;
+/**inicons**/
+caminando=0;
+atacando=1;
+casteando=2;
+descansando=3;
+/**fincons**/
+
+window.addEventListener("load", function () {
+	ctx = document.getElementById("cosi").getContext('2d');
+	setInterval("check();",1000);
+});
+function newConn()
+{
+	connection = new WebSocket("ws://localhost:8001");
+	connection.onopen = function () {
+		console.log("Connection opened");
+		connection.send("Login");
+	}
+	connection.onclose = function () {
+		console.log("Connection closed")
+		status=0;
+	}
+	connection.onerror = function () {
+		console.error("Connection error")
+	}
+	connection.onmessage = interpretarDatos;
+	status=1;
+}
+function interpretarDatos(e)
+{
+	dps+=e.data.length;
+	lps++;
+	var inn={};
+	eval("inn="+e.data);
+	if (inn.conid) conid=inn.conid;
+	if (inn.foga) {foga=inn.foga;}
+	if (inn.fogb) {fogb=inn.fogb;}
+	if (inn.minimap) {mapa=inn.minimap;mapear();}
+	if (inn.ping) { var d=(new Date()).getTime()-parseInt(inn.ping); ping=(d+' ms'); }
+	if (inn.ue) {
+		ultevent=inn.ue;
+	}
+}
+function mapear()
+{
+	ctx.clearRect(0,0,384,384);
+	var s=Math.sqrt(mapa.length),
+		u=384/s;
+		
+	var data=foga;
+	ctx.fillStyle="rgba(255,128,128,0.4)";
+	for(var i=0,x=0,y=0;i<data.length;i++)
+	{
+		if(x>=s){x=0;y++}
+		if(data[i]=='1')
+		{
+			ctx.fillRect(x*u,y*u,3,3);
+		}
+		x++;
+	}
+	
+	var data=fogb;
+	ctx.fillStyle="rgba(128,128,255,0.4)";
+	for(var i=0,x=0,y=0;i<data.length;i++)
+	{
+		if(x>=s){x=0;y++}
+		if(data[i]=='1')
+		{
+			ctx.fillRect(x*u,y*u,3,3);
+		}
+		x++;
+	}
+	
+	var data=mapa;
+	for(var i=0,x=0,y=0;i<data.length;i++)
+	{
+		if(x>=s){x=0;y++}
+		if(data[i]=='A')
+		{
+			ctx.strokeStyle="rgb(255,0,0)";
+			ctx.fillStyle="rgb(255,0,0)";
+			ctx.strokeRect(x*u,y*u,3,3);
+		}
+		else if(data[i]=='E')
+		{
+			ctx.strokeStyle="rgb(0,0,255)";
+			ctx.fillStyle="rgb(0,0,255)";
+			ctx.strokeRect(x*u,y*u,3,3);
+		}
+		else if(data[i]=='C')
+		{
+			ctx.strokeStyle="rgb(255,0,0)";
+			ctx.fillStyle="rgb(255,0,0)";
+			ctx.strokeRect(x*u,y*u,5,5);
+			ctx.fillRect(x*u,y*u,5,5);
+		}
+		else if(data[i]=='c')
+		{
+			ctx.strokeStyle="rgb(0,0,255)";
+			ctx.fillStyle="rgb(0,0,255)";
+			ctx.strokeRect(x*u,y*u,5,5);
+			ctx.fillRect(x*u,y*u,5,5);
+		}
+		x++;
+	}
+	fps++;
+}
+
+function check()
+{
+	document.querySelector('div.status').innerHTML="FPS: "+fps+" DPS: "+dps+" LPS: "+lps+" UE: "+ultevent;
+	fps=0;
+	dps=0;
+	lps=0;
+	if (status==0)
+		newConn();
+}
+function enviarAccionDatos()
+{
+	var ac=document.getElementById('txtaccion').value;
+	var da=document.getElementById('txtdatos').value;
+	if (ac=='ping')
+	{
+		da=(new Date()).getTime();
+	}
+	connection.send(ac+"|"+da);
+}
+function run()
+{
+	document.getElementById('txtdatos').onkeyup=function (e) { var o=e.keyCode; if (o==13) enviarAccionDatos(); }
+}
+</script>
+</head>
+
+<body onLoad="run();">
+<table>
+<tr><td>
+	<canvas id='cosi' width='384' height='384'>pete</canvas>
+</td><td>
+	<input type='text' id='txtaccion' placeholder="Accion"><br>
+	<input type='text' id='txtdatos' placeholder="Datos"> 
+	<button onClick='enviarAccionDatos();'>-></button>
+</td></tr>
+<tr><td colspan='2'>
+	<div class='status'></div>
+	<div class='cosascerca'></div>
+</td></tr>
+</table>
+</body>
+</html>
